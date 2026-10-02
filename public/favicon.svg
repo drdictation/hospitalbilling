@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <rect width="512" height="512" rx="112" fill="#090d16"/>
+  <rect x="24" y="24" width="464" height="464" rx="96" stroke="#10b981" stroke-opacity="0.3" stroke-width="8"/>
+  <!-- Medical Cross & Bill Symbol -->
+  <path d="M216 136h80v80h80v80h-80v80h-80v-80h-80v-80h80v-80z" fill="#10b981"/>
+  <circle cx="360" cy="360" r="72" fill="#047857"/>
+  <path d="M342 344h36m-18-24v50m-14 12h28" stroke="#ffffff" stroke-width="8" stroke-linecap="round"/>
+</svg>
