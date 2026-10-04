@@ -18,6 +18,56 @@ export interface PatientBillingGroup {
 }
 
 /**
+ * Format any date string into 'DD - MMMM - YYYY' (e.g., '04 - October - 2026').
+ * Guarantees standard Day - Month - Year order across all encounters, DOB, and tables.
+ */
+export function formatDocxDate(dateStr?: string): string {
+  if (!dateStr || dateStr.trim() === '') return 'N/A';
+
+  const months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
+  // Match YYYY-MM-DD
+  const isoMatch = dateStr.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (isoMatch) {
+    const y = isoMatch[1];
+    const m = parseInt(isoMatch[2], 10) - 1;
+    const d = String(parseInt(isoMatch[3], 10)).padStart(2, '0');
+    if (m >= 0 && m < 12) {
+      return `${d} - ${months[m]} - ${y}`;
+    }
+  }
+
+  // Match DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY
+  const dmyMatch = dateStr.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
+  if (dmyMatch) {
+    const d = String(parseInt(dmyMatch[1], 10)).padStart(2, '0');
+    const m = parseInt(dmyMatch[2], 10) - 1;
+    let y = dmyMatch[3];
+    if (y.length === 2) {
+      const numY = parseInt(y, 10);
+      y = numY > 30 ? `19${y}` : `20${y}`;
+    }
+    if (m >= 0 && m < 12) {
+      return `${d} - ${months[m]} - ${y}`;
+    }
+  }
+
+  // Fallback to JS Date if parseable
+  const parsed = new Date(dateStr);
+  if (!isNaN(parsed.getTime())) {
+    const d = String(parsed.getDate()).padStart(2, '0');
+    const m = months[parsed.getMonth()];
+    const y = parsed.getFullYear();
+    return `${d} - ${m} - ${y}`;
+  }
+
+  return dateStr;
+}
+
+/**
  * Measure image dimensions to guarantee 100% preservation of aspect ratio.
  */
 async function getImageDimensions(blob: Blob): Promise<{ width: number; height: number }> {
@@ -250,7 +300,7 @@ export async function generateBillingDocx(
           new TextRun({ text: 'UR / MRN: ', bold: true }),
           new TextRun(pat.mrn || 'N/A'),
           new TextRun({ text: '   |   DOB: ', bold: true }),
-          new TextRun(pat.dob || 'N/A'),
+          new TextRun(formatDocxDate(pat.dob)),
           new TextRun({ text: '   |   Medicare: ', bold: true }),
           new TextRun(pat.medicareNo || 'N/A'),
           new TextRun({ text: '   |   Hospital: ', bold: true }),
@@ -307,22 +357,22 @@ export async function generateBillingDocx(
       tableHeader: true,
       children: [
         new TableCell({
-          width: { size: 18, type: WidthType.PERCENTAGE },
+          width: { size: 24, type: WidthType.PERCENTAGE },
           shading: { fill: 'F1F5F9' },
           children: [new Paragraph({ children: [new TextRun({ text: 'Service Date', bold: true })] })],
         }),
         new TableCell({
-          width: { size: 28, type: WidthType.PERCENTAGE },
+          width: { size: 26, type: WidthType.PERCENTAGE },
           shading: { fill: 'F1F5F9' },
           children: [new Paragraph({ children: [new TextRun({ text: 'Hospital', bold: true })] })],
         }),
         new TableCell({
-          width: { size: 24, type: WidthType.PERCENTAGE },
+          width: { size: 22, type: WidthType.PERCENTAGE },
           shading: { fill: 'F1F5F9' },
           children: [new Paragraph({ children: [new TextRun({ text: 'MBS Codes', bold: true })] })],
         }),
         new TableCell({
-          width: { size: 30, type: WidthType.PERCENTAGE },
+          width: { size: 28, type: WidthType.PERCENTAGE },
           shading: { fill: 'F1F5F9' },
           children: [new Paragraph({ children: [new TextRun({ text: 'Clinical Notes', bold: true })] })],
         }),
@@ -333,7 +383,7 @@ export async function generateBillingDocx(
       return new TableRow({
         children: [
           new TableCell({
-            children: [new Paragraph(enc.serviceDate)],
+            children: [new Paragraph(formatDocxDate(enc.serviceDate))],
           }),
           new TableCell({
             children: [new Paragraph(enc.hospital)],
