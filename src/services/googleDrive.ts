@@ -79,7 +79,7 @@ export async function getOrCreateFolder(
 export async function ensureMonthlyFolderHierarchy(
   token: string,
   date: Date = new Date()
-): Promise<{ rootId: string; monthId: string; encountersFolderId: string; imagesFolderId: string }> {
+): Promise<{ rootId: string; monthId: string; encountersFolderId: string; imagesFolderId: string; exportsFolderId: string }> {
   const rootId = await getOrCreateFolder(token, 'Private Hospital Billing');
   
   const yearStr = date.getFullYear().toString();
@@ -92,12 +92,33 @@ export async function ensureMonthlyFolderHierarchy(
   const monthStr = monthNames[date.getMonth()];
   const monthId = await getOrCreateFolder(token, monthStr, yearId);
 
-  const [encountersFolderId, imagesFolderId] = await Promise.all([
+  const [encountersFolderId, imagesFolderId, exportsFolderId] = await Promise.all([
     getOrCreateFolder(token, 'encounters', monthId),
     getOrCreateFolder(token, 'images', monthId),
+    getOrCreateFolder(token, 'exports', monthId),
   ]);
 
-  return { rootId, monthId, encountersFolderId, imagesFolderId };
+  return { rootId, monthId, encountersFolderId, imagesFolderId, exportsFolderId };
+}
+
+/**
+ * Upload a compiled monthly billing export document (DOCX) to Google Drive.
+ */
+export async function uploadExportDocumentToDrive(
+  token: string,
+  fileName: string,
+  docxBlob: Blob,
+  date: Date = new Date()
+): Promise<string> {
+  const { exportsFolderId } = await ensureMonthlyFolderHierarchy(token, date);
+  const fileId = await uploadOrUpdateFile(
+    token,
+    fileName,
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    exportsFolderId,
+    docxBlob
+  );
+  return fileId;
 }
 
 /**

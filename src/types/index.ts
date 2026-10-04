@@ -21,6 +21,16 @@ export interface Encounter {
   billingStatus: BillingStatus;
   exportId?: string;
   notes?: string;
+  extractedData?: {
+    mrn?: string;
+    patientName?: string;
+    dob?: string;
+    medicareNo?: string;
+    rawText?: string;
+    barcodeValue?: string;
+    extractedAt?: string;
+    isProcessing?: boolean;
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -42,8 +52,9 @@ export interface Patient {
   primaryHospital: string;
   mrn: string; // Medical Record Number / UR
   name: string;
-  dob: string; // YYYY-MM-DD
+  dob: string; // DD/MM/YYYY or YYYY-MM-DD
   gender?: string;
+  medicareNo?: string;
   encounterIds: string[];
   createdAt: string;
   updatedAt: string;
@@ -61,7 +72,10 @@ export interface AuditLog {
     | 'RETRY_SUCCESSFUL'
     | 'RECORD_EDITED'
     | 'RECONCILIATION_RUN'
-    | 'RECONCILIATION_REPAIR';
+    | 'RECONCILIATION_REPAIR'
+    | 'PATIENT_MATCHED'
+    | 'PATIENT_CREATED'
+    | 'PATIENT_MANUAL_REVIEW';
   encounterId?: string;
   details?: Record<string, any>;
 }

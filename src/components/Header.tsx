@@ -1,4 +1,3 @@
-import React from 'react';
 import { 
   Building2, 
   Wifi, 
@@ -7,7 +6,8 @@ import {
   CheckCircle2, 
   Settings, 
   RefreshCw,
-  ChevronDown
+  ChevronDown,
+  FileSpreadsheet
 } from 'lucide-react';
 import type { AppSettings } from '../types';
 
@@ -16,6 +16,7 @@ interface HeaderProps {
   onUpdateHospital: (hospital: string) => void;
   onOpenSettings: () => void;
   onOpenReconciliation: () => void;
+  onOpenExport?: () => void;
   unsyncedCount: number;
   isSyncing: boolean;
   onRetrySync: () => void;
@@ -26,6 +27,7 @@ export const Header: React.FC<HeaderProps> = ({
   onUpdateHospital,
   onOpenSettings,
   onOpenReconciliation,
+  onOpenExport,
   unsyncedCount,
   isSyncing,
   onRetrySync,
@@ -49,6 +51,18 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Export Monthly Billing Button */}
+          {onOpenExport && (
+            <button
+              onClick={onOpenExport}
+              title="Export Monthly Billing (.docx)"
+              className="p-2 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 transition-colors flex items-center gap-1 cursor-pointer"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+              <span className="text-[11px] font-bold hidden sm:inline">Export</span>
+            </button>
+          )}
+
           {/* Network Pill */}
           <div
             className={`flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium border ${

@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { CheckCircle, Clock } from 'lucide-react';
-import type { Encounter, ImageBlob } from '../types';
+import type { Encounter, ImageBlob, Patient } from '../types';
 import { EncounterCard } from './EncounterCard';
 
 interface EncounterListProps {
   encounters: Encounter[];
+  patients?: Record<string, Patient>;
   imageBlobs: Record<string, ImageBlob>;
   onRetrySync: (encounterId: string) => void;
   onUpdateEncounter: (encounterId: string, updates: Partial<Encounter>) => void;
+  onUpdatePatient?: (patientId: string, updates: Partial<Patient>) => void;
   onViewImage: (dataUrl: string) => void;
 }
 
@@ -15,9 +17,11 @@ type FilterTab = 'today' | 'month' | 'attention';
 
 export const EncounterList: React.FC<EncounterListProps> = ({
   encounters,
+  patients = {},
   imageBlobs,
   onRetrySync,
   onUpdateEncounter,
+  onUpdatePatient,
   onViewImage,
 }) => {
   const [activeTab, setActiveTab] = useState<FilterTab>('today');
@@ -74,7 +78,7 @@ export const EncounterList: React.FC<EncounterListProps> = ({
       <div className="flex rounded-xl bg-slate-900 p-1 border border-slate-800 mb-3 text-xs font-semibold">
         <button
           onClick={() => setActiveTab('today')}
-          className={`flex-1 py-1.5 rounded-lg transition-colors ${
+          className={`flex-1 py-1.5 rounded-lg transition-colors cursor-pointer ${
             activeTab === 'today'
               ? 'bg-slate-800 text-white shadow-sm'
               : 'text-slate-400 hover:text-slate-200'
@@ -84,7 +88,7 @@ export const EncounterList: React.FC<EncounterListProps> = ({
         </button>
         <button
           onClick={() => setActiveTab('month')}
-          className={`flex-1 py-1.5 rounded-lg transition-colors ${
+          className={`flex-1 py-1.5 rounded-lg transition-colors cursor-pointer ${
             activeTab === 'month'
               ? 'bg-slate-800 text-white shadow-sm'
               : 'text-slate-400 hover:text-slate-200'
@@ -94,15 +98,15 @@ export const EncounterList: React.FC<EncounterListProps> = ({
         </button>
         <button
           onClick={() => setActiveTab('attention')}
-          className={`flex-1 py-1.5 rounded-lg transition-colors relative ${
+          className={`flex-1 py-1.5 rounded-lg transition-colors cursor-pointer relative ${
             activeTab === 'attention'
               ? 'bg-slate-800 text-white shadow-sm'
               : 'text-slate-400 hover:text-slate-200'
           }`}
         >
-          <span>Attention</span>
+          <span>Needs Attention</span>
           {attentionEncounters.length > 0 && (
-            <span className="ml-1 px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-300 text-[10px] border border-amber-500/40">
+            <span className="ml-1.5 px-1.5 py-0.2 rounded-full bg-rose-500/25 text-rose-300 text-[10px] border border-rose-500/40">
               {attentionEncounters.length}
             </span>
           )}
@@ -124,9 +128,11 @@ export const EncounterList: React.FC<EncounterListProps> = ({
             <EncounterCard
               key={enc.id}
               encounter={enc}
+              patient={enc.patientId ? patients[enc.patientId] : undefined}
               imageBlob={imageBlobs[enc.imageBlobId]}
               onRetrySync={onRetrySync}
               onUpdateEncounter={onUpdateEncounter}
+              onUpdatePatient={onUpdatePatient}
               onViewImage={onViewImage}
             />
           ))

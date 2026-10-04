@@ -39,6 +39,14 @@ export class HospitalBillingDB extends Dexie {
       auditLogs: '&id, timestamp, action, encounterId',
       settings: '&id'
     });
+
+    this.version(2).stores({
+      encounters: '&id, serviceDate, hospital, syncStatus, billingStatus, patientMatchStatus, patientId, createdAt',
+      imageBlobs: '&id, encounterId',
+      patients: '&id, mrn, primaryHospital, [primaryHospital+mrn], name',
+      auditLogs: '&id, timestamp, action, encounterId',
+      settings: '&id'
+    });
   }
 }
 

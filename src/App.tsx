@@ -6,23 +6,26 @@ import {
   persistEncounterLocally, 
   logAudit 
 } from './db';
-import type { AppSettings, CompressedImageResult, Encounter, ImageBlob } from './types';
+import type { AppSettings, CompressedImageResult, Encounter, ImageBlob, Patient } from './types';
 import { Header } from './components/Header';
 import { CaptureSection } from './components/CaptureSection';
 import { EncounterList } from './components/EncounterList';
 import { ReconciliationModal } from './components/ReconciliationModal';
 import { SettingsModal } from './components/SettingsModal';
 import { ImageModal } from './components/ImageModal';
+import { ExportModal } from './components/ExportModal';
 import { 
   syncSingleEncounter, 
   processSyncQueue, 
   setupSyncLifecycleListeners 
 } from './services/syncEngine';
+import { processEncounterIdentity } from './services/extractionPipeline';
 
 export const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isReconcileOpen, setIsReconcileOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isExportOpen, setIsExportOpen] = useState(false);
   const [selectedImageModalUrl, setSelectedImageModalUrl] = useState<string | null>(null);
 
   // Live query for settings
@@ -35,6 +38,20 @@ export const App: React.FC = () => {
     db.encounters.orderBy('createdAt').reverse().toArray(), 
     []
   ) || [];
+
+  // Live query for patients
+  const patientsList = useLiveQuery<Patient[]>(() => 
+    db.patients.toArray(), 
+    []
+  ) || [];
+
+  const patientsMap = React.useMemo(() => {
+    const map: Record<string, Patient> = {};
+    for (const p of patientsList) {
+      map[p.id] = p;
+    }
+    return map;
+  }, [patientsList]);
 
   // Live query for image blobs
   const imageBlobsList = useLiveQuery<ImageBlob[]>(() => 
@@ -98,9 +115,12 @@ export const App: React.FC = () => {
       mbsCodes: data.mbsCodes,
       imageBlobId,
       syncStatus: 'LOCAL_ONLY',
-      patientMatchStatus: 'UNIDENTIFIED', // Phase 3 will populate OCR / Patient match
+      patientMatchStatus: 'UNIDENTIFIED',
       billingStatus: 'UNBILLED',
       notes: data.notes,
+      extractedData: {
+        isProcessing: true,
+      },
       createdAt: nowIso,
       updatedAt: nowIso,
     };
@@ -117,13 +137,21 @@ export const App: React.FC = () => {
       createdAt: nowIso,
     };
 
-    // 1. Atomic write to IndexedDB
+    // 1. Atomic write to IndexedDB (<50ms)
     const result = await persistEncounterLocally(newEncounter, newImageBlob);
     if (!result.success) {
       return result;
     }
 
-    // 2. Eager background sync attempt (does not block UI)
+    // 2. Asynchronous background patient extraction (Barcode + OCR)
+    processEncounterIdentity(encounterId)
+      .then(() => {
+        // Once patient identity is linked, trigger sync to update remote Drive JSON
+        syncSingleEncounter(encounterId).catch(() => {});
+      })
+      .catch((err) => console.warn('Background patient extraction error:', err));
+
+    // 3. Eager background sync attempt (does not block UI)
     syncSingleEncounter(encounterId).catch((err) =>
       console.warn('Background sync error after save:', err)
     );
@@ -162,6 +190,14 @@ export const App: React.FC = () => {
     syncSingleEncounter(encounterId).catch(() => {});
   };
 
+  // Handle updating patient details directly
+  const handleUpdatePatient = async (patientId: string, updates: Partial<Patient>) => {
+    await db.patients.update(patientId, {
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    });
+  };
+
   // Handle settings update
   const handleUpdateSettings = async (updates: Partial<AppSettings>) => {
     await db.settings.update('current_settings', updates);
@@ -175,6 +211,7 @@ export const App: React.FC = () => {
         onUpdateHospital={handleUpdateHospital}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenReconciliation={() => setIsReconcileOpen(true)}
+        onOpenExport={() => setIsExportOpen(true)}
         unsyncedCount={unsyncedCount}
         isSyncing={isSyncing}
         onRetrySync={handleRetryAllSync}
@@ -192,14 +229,25 @@ export const App: React.FC = () => {
         {/* Encounters Feed */}
         <EncounterList
           encounters={encounters}
+          patients={patientsMap}
           imageBlobs={imageBlobsMap}
           onRetrySync={handleRetrySingleSync}
           onUpdateEncounter={handleUpdateEncounter}
+          onUpdatePatient={handleUpdatePatient}
           onViewImage={(url) => setSelectedImageModalUrl(url)}
         />
       </main>
 
       {/* Modals */}
+      <ExportModal
+        isOpen={isExportOpen}
+        onClose={() => setIsExportOpen(false)}
+        encounters={encounters}
+        patients={patientsMap}
+        imageBlobs={imageBlobsMap}
+        googleAccessToken={settings?.googleAccessToken}
+      />
+
       <ReconciliationModal
         isOpen={isReconcileOpen}
         onClose={() => setIsReconcileOpen(false)}
