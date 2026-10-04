@@ -13,6 +13,46 @@ export interface PatientBillingGroup {
   patient: Partial<Patient>;
   encounters: Encounter[];
   primaryStickerBlob?: Blob;
+  primaryImageWidth?: number;
+  primaryImageHeight?: number;
+}
+
+/**
+ * Measure image dimensions to guarantee 100% preservation of aspect ratio.
+ */
+async function getImageDimensions(blob: Blob): Promise<{ width: number; height: number }> {
+  if (typeof createImageBitmap === 'function') {
+    try {
+      const bitmap = await createImageBitmap(blob);
+      const width = bitmap.width;
+      const height = bitmap.height;
+      bitmap.close();
+      if (width > 0 && height > 0) {
+        return { width, height };
+      }
+    } catch {
+      // Fallback to Image element
+    }
+  }
+
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      return resolve({ width: 1200, height: 900 });
+    }
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      const width = img.naturalWidth || 1200;
+      const height = img.naturalHeight || 900;
+      URL.revokeObjectURL(url);
+      resolve({ width, height });
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve({ width: 1200, height: 900 });
+    };
+    img.src = url;
+  });
 }
 
 /**
@@ -84,6 +124,8 @@ export function groupEncountersByPatient(
 
   for (const enc of encounters) {
     const pId = enc.patientId || enc.extractedData?.mrn || enc.id;
+    const imgRecord = imageBlobs[enc.imageBlobId];
+
     if (!groupMap.has(pId)) {
       const pat = enc.patientId && patients[enc.patientId]
         ? patients[enc.patientId]
@@ -95,16 +137,24 @@ export function groupEncountersByPatient(
             primaryHospital: enc.hospital,
           };
 
-      const sticker = imageBlobs[enc.imageBlobId]?.blob;
-
       groupMap.set(pId, {
         patient: pat,
         encounters: [],
-        primaryStickerBlob: sticker,
+        primaryStickerBlob: imgRecord?.blob,
+        primaryImageWidth: imgRecord?.width,
+        primaryImageHeight: imgRecord?.height,
       });
     }
 
-    groupMap.get(pId)!.encounters.push(enc);
+    const grp = groupMap.get(pId)!;
+    grp.encounters.push(enc);
+
+    // If initial encounter lacked image, populate from subsequent encounter
+    if (!grp.primaryStickerBlob && imgRecord?.blob) {
+      grp.primaryStickerBlob = imgRecord.blob;
+      grp.primaryImageWidth = imgRecord.width;
+      grp.primaryImageHeight = imgRecord.height;
+    }
   }
 
   // Sort each group's encounters chronologically
@@ -206,26 +256,45 @@ export async function generateBillingDocx(
           new TextRun({ text: '   |   Hospital: ', bold: true }),
           new TextRun(pat.primaryHospital || group.encounters[0]?.hospital || 'N/A'),
         ],
-        spacing: { after: 150 },
+        spacing: { after: 120 },
       })
     );
 
-    // Sticker Photo Embedding (if available)
+    // Sticker Photo Embedding (if available) - strictly preserves natural aspect ratio
     if (group.primaryStickerBlob) {
       try {
         const imageBytes = await blobToArrayBuffer(group.primaryStickerBlob);
+
+        let origWidth = group.primaryImageWidth;
+        let origHeight = group.primaryImageHeight;
+
+        if (!origWidth || !origHeight || origWidth <= 0 || origHeight <= 0) {
+          const dims = await getImageDimensions(group.primaryStickerBlob);
+          origWidth = dims.width;
+          origHeight = dims.height;
+        }
+
+        // Standard A4 printable area width is ~450pt with standard margins.
+        // Cap max width at 450pt and max height at 260pt while strictly preserving aspect ratio.
+        const maxPtWidth = 450;
+        const maxPtHeight = 260;
+
+        const scale = Math.min(maxPtWidth / origWidth, maxPtHeight / origHeight);
+        const finalWidth = Math.round(origWidth * scale);
+        const finalHeight = Math.round(origHeight * scale);
+
         docSections.push(
           new Paragraph({
             children: [
               new ImageRun({
                 data: imageBytes,
                 transformation: {
-                  width: 320,
-                  height: 160,
+                  width: finalWidth,
+                  height: finalHeight,
                 },
               } as any),
             ],
-            spacing: { after: 180 },
+            spacing: { before: 120, after: 200 },
           })
         );
       } catch (imgErr) {
@@ -358,7 +427,8 @@ export async function executeMonthlyBillingExport(
   let driveFileId: string | undefined;
   if (googleAccessToken) {
     try {
-      driveFileId = await uploadExportDocumentToDrive(googleAccessToken, fileName, docxBlob, new Date());
+      const exportDate = encounters[0]?.serviceDate || new Date();
+      driveFileId = await uploadExportDocumentToDrive(googleAccessToken, fileName, docxBlob, exportDate);
     } catch (driveErr) {
       console.warn('Drive upload of export failed:', driveErr);
     }

@@ -41,12 +41,38 @@ async function driveFetch(url: string, token: string, options: RequestInit = {})
 }
 
 /**
- * Find or create a folder on Google Drive
+ * Robust date component parser that prevents timezone shifts when parsing YYYY-MM-DD.
+ */
+export function parseDateComponents(input: Date | string): { year: number; monthIndex: number } {
+  if (typeof input === 'string') {
+    const parts = input.split(/[-/]/);
+    if (parts.length >= 2) {
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      if (!isNaN(y) && !isNaN(m) && m >= 1 && m <= 12) {
+        return { year: y, monthIndex: m - 1 };
+      }
+    }
+    const parsed = new Date(input);
+    if (!isNaN(parsed.getTime())) {
+      return { year: parsed.getFullYear(), monthIndex: parsed.getMonth() };
+    }
+  } else if (input instanceof Date && !isNaN(input.getTime())) {
+    return { year: input.getFullYear(), monthIndex: input.getMonth() };
+  }
+  const now = new Date();
+  return { year: now.getFullYear(), monthIndex: now.getMonth() };
+}
+
+/**
+ * Find or create a folder on Google Drive.
+ * If legacyNames is provided and a legacy folder is found, it automatically renames it to folderName.
  */
 export async function getOrCreateFolder(
   token: string,
   folderName: string,
-  parentId?: string
+  parentId?: string,
+  legacyNames: string[] = []
 ): Promise<string> {
   const parentQuery = parentId ? `'${parentId}' in parents and ` : '';
   const query = `${parentQuery}name = '${folderName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
@@ -56,6 +82,27 @@ export async function getOrCreateFolder(
 
   if (result.files && result.files.length > 0) {
     return result.files[0].id;
+  }
+
+  // Check if a legacy folder exists under this parent (e.g. '10 October' -> '10 - October')
+  for (const legacy of legacyNames) {
+    const legacyQuery = `${parentQuery}name = '${legacy}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+    const legUrl = `${DRIVE_API}?q=${encodeURIComponent(legacyQuery)}&fields=files(id,name)`;
+    try {
+      const legResult = await driveFetch(legUrl, token);
+      if (legResult.files && legResult.files.length > 0) {
+        const existingId = legResult.files[0].id;
+        // Rename legacy folder to folderName seamlessly
+        await driveFetch(`${DRIVE_API}/${existingId}`, token, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: folderName }),
+        });
+        return existingId;
+      }
+    } catch (legErr) {
+      console.warn(`Could not check/rename legacy folder "${legacy}":`, legErr);
+    }
   }
 
   // Folder doesn't exist, create it
@@ -74,23 +121,35 @@ export async function getOrCreateFolder(
 
 /**
  * Ensure the full monthly folder structure exists:
- * Private Hospital Billing/YYYY/MM MonthName/encounters & images
+ * Private Hospital Billing/YYYY/MM - MonthName/encounters & images & exports
  */
 export async function ensureMonthlyFolderHierarchy(
   token: string,
-  date: Date = new Date()
+  dateOrDateStr: Date | string = new Date()
 ): Promise<{ rootId: string; monthId: string; encountersFolderId: string; imagesFolderId: string; exportsFolderId: string }> {
   const rootId = await getOrCreateFolder(token, 'Private Hospital Billing');
   
-  const yearStr = date.getFullYear().toString();
+  const { year, monthIndex } = parseDateComponents(dateOrDateStr);
+  const yearStr = year.toString();
   const yearId = await getOrCreateFolder(token, yearStr, rootId);
 
+  // Month folder naming: '10 - October' clearly indicates month 10, not the 10th of October
   const monthNames = [
+    '01 - January', '02 - February', '03 - March', '04 - April', '05 - May', '06 - June',
+    '07 - July', '08 - August', '09 - September', '10 - October', '11 - November', '12 - December'
+  ];
+
+  // Legacy format used in earlier version
+  const legacyMonthNames = [
     '01 January', '02 February', '03 March', '04 April', '05 May', '06 June',
     '07 July', '08 August', '09 September', '10 October', '11 November', '12 December'
   ];
-  const monthStr = monthNames[date.getMonth()];
-  const monthId = await getOrCreateFolder(token, monthStr, yearId);
+
+  const monthStr = monthNames[monthIndex];
+  const legacyMonthStr = legacyMonthNames[monthIndex];
+
+  // Automatically migrate legacy '10 October' to '10 - October'
+  const monthId = await getOrCreateFolder(token, monthStr, yearId, [legacyMonthStr]);
 
   const [encountersFolderId, imagesFolderId, exportsFolderId] = await Promise.all([
     getOrCreateFolder(token, 'encounters', monthId),
@@ -108,9 +167,9 @@ export async function uploadExportDocumentToDrive(
   token: string,
   fileName: string,
   docxBlob: Blob,
-  date: Date = new Date()
+  dateOrDateStr: Date | string = new Date()
 ): Promise<string> {
-  const { exportsFolderId } = await ensureMonthlyFolderHierarchy(token, date);
+  const { exportsFolderId } = await ensureMonthlyFolderHierarchy(token, dateOrDateStr);
   const fileId = await uploadOrUpdateFile(
     token,
     fileName,
@@ -205,8 +264,7 @@ export async function uploadEncounterToDrive(
   encounter: Encounter,
   imageBlob: ImageBlob
 ): Promise<RemoteSyncResult> {
-  const serviceDate = new Date(encounter.serviceDate);
-  const { encountersFolderId, imagesFolderId } = await ensureMonthlyFolderHierarchy(token, serviceDate);
+  const { encountersFolderId, imagesFolderId } = await ensureMonthlyFolderHierarchy(token, encounter.serviceDate);
 
   // 1. Upload sticker image (idempotent name: img_{encounter.id}.jpg)
   const imageFileName = `img_${encounter.id}.jpg`;
@@ -242,9 +300,9 @@ export async function uploadEncounterToDrive(
 export async function performReconciliation(
   token: string,
   localEncounters: Encounter[],
-  date: Date = new Date()
+  dateOrDateStr: Date | string = new Date()
 ): Promise<DriveReconciliationReport> {
-  const { encountersFolderId } = await ensureMonthlyFolderHierarchy(token, date);
+  const { encountersFolderId } = await ensureMonthlyFolderHierarchy(token, dateOrDateStr);
 
   // Query all remote encounter JSON files
   const query = `'${encountersFolderId}' in parents and mimeType = 'application/json' and trashed = false`;
