@@ -40,6 +40,8 @@ async function driveFetch(url: string, token: string, options: RequestInit = {})
   return res.json();
 }
 
+import { getLocalYearMonth } from '../utils/dateUtils';
+
 /**
  * Robust date component parser that prevents timezone shifts when parsing YYYY-MM-DD.
  */
@@ -55,13 +57,12 @@ export function parseDateComponents(input: Date | string): { year: number; month
     }
     const parsed = new Date(input);
     if (!isNaN(parsed.getTime())) {
-      return { year: parsed.getFullYear(), monthIndex: parsed.getMonth() };
+      return getLocalYearMonth(parsed);
     }
   } else if (input instanceof Date && !isNaN(input.getTime())) {
-    return { year: input.getFullYear(), monthIndex: input.getMonth() };
+    return getLocalYearMonth(input);
   }
-  const now = new Date();
-  return { year: now.getFullYear(), monthIndex: now.getMonth() };
+  return getLocalYearMonth();
 }
 
 /**

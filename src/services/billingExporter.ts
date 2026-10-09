@@ -448,6 +448,8 @@ export async function generateBillingDocx(
 /**
  * Execute full export: generate DOCX, trigger browser download, optionally upload to Drive, and mark exported.
  */
+import { getLocalDateString } from '../utils/dateUtils';
+
 export async function executeMonthlyBillingExport(
   encounters: Encounter[],
   patients: Record<string, Patient>,
@@ -456,7 +458,7 @@ export async function executeMonthlyBillingExport(
   googleAccessToken?: string
 ): Promise<{ success: boolean; docxBlob: Blob; driveFileId?: string; exportId: string }> {
   const exportId = crypto.randomUUID();
-  const dateStamp = new Date().toISOString().split('T')[0];
+  const dateStamp = getLocalDateString();
   const safeMonth = monthLabel.replace(/[^A-Za-z0-9_-]/g, '_');
   const fileName = `Billing_Export_${safeMonth}_${dateStamp}.docx`;
 

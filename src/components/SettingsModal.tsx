@@ -26,6 +26,7 @@ declare global {
           initTokenClient: (config: {
             client_id: string;
             scope: string;
+            prompt?: string;
             callback: (response: { access_token?: string; error?: any; expires_in?: number }) => void;
           }) => {
             requestAccessToken: () => void;
@@ -94,6 +95,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       const client = window.google.accounts.oauth2.initTokenClient({
         client_id: activeClientId,
         scope: 'https://www.googleapis.com/auth/drive.file',
+        prompt: '',
         callback: async (res) => {
           setIsAuthorizing(false);
           if (res.error) {

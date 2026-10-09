@@ -139,27 +139,50 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Critical Unsynced Warning Banner */}
       {unsyncedCount > 0 && (
         <div className="mt-2.5 max-w-lg mx-auto">
-          <div 
-            onClick={onRetrySync}
-            className="flex items-center justify-between px-3 py-2 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-300 cursor-pointer hover:bg-amber-500/25 transition-all shadow-sm shadow-amber-950/50"
-          >
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-400 animate-pulse shrink-0" />
-              <span className="text-xs font-semibold tracking-tight">
-                {unsyncedCount} {unsyncedCount === 1 ? 'ENCOUNTER' : 'ENCOUNTERS'} NOT SYNCED
-              </span>
-            </div>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onRetrySync();
-              }}
-              disabled={isSyncing}
-              className="text-[11px] font-bold uppercase tracking-wider bg-amber-500/30 hover:bg-amber-500/40 text-amber-200 px-2 py-0.5 rounded border border-amber-500/40 transition-colors"
+          {settings?.googleTokenExpiresAt && Date.now() > settings.googleTokenExpiresAt ? (
+            <div
+              onClick={onOpenSettings}
+              className="flex items-center justify-between px-3 py-2 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-300 cursor-pointer hover:bg-rose-500/25 transition-all shadow-sm shadow-rose-950/50"
             >
-              {isSyncing ? 'Syncing...' : 'Sync Now'}
-            </button>
-          </div>
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-rose-400 animate-pulse shrink-0" />
+                <span className="text-xs font-semibold tracking-tight">
+                  Drive session expired ({unsyncedCount} pending)
+                </span>
+              </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenSettings();
+                }}
+                className="text-[11px] font-bold uppercase tracking-wider bg-rose-500/30 hover:bg-rose-500/40 text-rose-200 px-2 py-0.5 rounded border border-rose-500/40 transition-colors"
+              >
+                Reconnect
+              </button>
+            </div>
+          ) : (
+            <div 
+              onClick={onRetrySync}
+              className="flex items-center justify-between px-3 py-2 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-300 cursor-pointer hover:bg-amber-500/25 transition-all shadow-sm shadow-amber-950/50"
+            >
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-400 animate-pulse shrink-0" />
+                <span className="text-xs font-semibold tracking-tight">
+                  {unsyncedCount} {unsyncedCount === 1 ? 'ENCOUNTER' : 'ENCOUNTERS'} NOT SYNCED
+                </span>
+              </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRetrySync();
+                }}
+                disabled={isSyncing}
+                className="text-[11px] font-bold uppercase tracking-wider bg-amber-500/30 hover:bg-amber-500/40 text-amber-200 px-2 py-0.5 rounded border border-amber-500/40 transition-colors"
+              >
+                {isSyncing ? 'Syncing...' : 'Sync Now'}
+              </button>
+            </div>
+          )}
         </div>
       )}
 

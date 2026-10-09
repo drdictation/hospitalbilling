@@ -54,7 +54,12 @@ export async function syncSingleEncounter(encounterId: string): Promise<boolean>
     return true;
   } catch (err: any) {
     console.error(`Sync failed for encounter ${encounterId}:`, err);
-    const errorMessage = err?.message || 'Network or upload failure';
+    let errorMessage = err?.message || 'Network or upload failure';
+    if (errorMessage.includes('401')) {
+      errorMessage = 'Google Drive token expired. Please reconnect.';
+      // Mark token expired in settings so app warns user clearly
+      await db.settings.update('current_settings', { googleTokenExpiresAt: 0 });
+    }
     await updateSyncStatus(encounterId, 'SYNC_ERROR', undefined, errorMessage);
     await logAudit('UPLOAD_FAILED', encounterId, { error: errorMessage });
     return false;

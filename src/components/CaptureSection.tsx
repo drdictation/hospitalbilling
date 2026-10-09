@@ -3,6 +3,8 @@ import { Camera, Check, Plus, X, Calendar, Sparkles } from 'lucide-react';
 import type { AppSettings, CompressedImageResult } from '../types';
 import { compressStickerImage } from '../utils/imageCompressor';
 
+import { getLocalDateString } from '../utils/dateUtils';
+
 interface CaptureSectionProps {
   settings: AppSettings | null;
   onSaveEncounter: (data: {
@@ -23,7 +25,7 @@ export const CaptureSection: React.FC<CaptureSectionProps> = ({
 
   const [compressedImage, setCompressedImage] = useState<CompressedImageResult | null>(null);
   const [isCompressing, setIsCompressing] = useState(false);
-  const [serviceDate, setServiceDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [serviceDate, setServiceDate] = useState(() => getLocalDateString());
   const [selectedCodes, setSelectedCodes] = useState<string[]>(['116']); // default to 116 (subsequent consult)
   const [customCodeInput, setCustomCodeInput] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(false);

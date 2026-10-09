@@ -15,6 +15,8 @@ interface EncounterListProps {
 
 type FilterTab = 'today' | 'month' | 'attention';
 
+import { getLocalDateString } from '../utils/dateUtils';
+
 export const EncounterList: React.FC<EncounterListProps> = ({
   encounters,
   patients = {},
@@ -26,7 +28,7 @@ export const EncounterList: React.FC<EncounterListProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<FilterTab>('today');
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getLocalDateString();
 
   const todayEncounters = encounters.filter((e) => e.serviceDate === todayStr);
   const attentionEncounters = encounters.filter(
