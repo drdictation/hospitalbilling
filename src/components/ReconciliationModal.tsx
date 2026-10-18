@@ -11,6 +11,7 @@ import {
 import type { AuditLog, Encounter } from '../types';
 import { performReconciliation, type DriveReconciliationReport } from '../services/googleDrive';
 import { logAudit } from '../db';
+import { formatMelbourneTime } from '../utils/dateUtils';
 
 interface ReconciliationModalProps {
   isOpen: boolean;
@@ -197,7 +198,7 @@ export const ReconciliationModal: React.FC<ReconciliationModalProps> = ({
                       )}
                     </div>
                     <span className="text-slate-500 shrink-0">
-                      {new Date(log.timestamp).toLocaleTimeString()}
+                      {formatMelbourneTime(log.timestamp)}
                     </span>
                   </div>
                 ))

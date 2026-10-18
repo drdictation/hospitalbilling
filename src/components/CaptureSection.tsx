@@ -3,7 +3,7 @@ import { Camera, Check, Plus, X, Calendar, Sparkles } from 'lucide-react';
 import type { AppSettings, CompressedImageResult } from '../types';
 import { compressStickerImage } from '../utils/imageCompressor';
 
-import { getLocalDateString } from '../utils/dateUtils';
+import { getLocalDateString, formatAustralianDate } from '../utils/dateUtils';
 
 interface CaptureSectionProps {
   settings: AppSettings | null;
@@ -186,6 +186,9 @@ export const CaptureSection: React.FC<CaptureSectionProps> = ({
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
             <Calendar className="w-4 h-4 text-emerald-400" />
             <span>Service Date</span>
+            <span className="text-[11px] text-emerald-400 font-mono font-medium">
+              ({formatAustralianDate(serviceDate)})
+            </span>
           </div>
           <input
             type="date"

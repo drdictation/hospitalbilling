@@ -20,6 +20,7 @@ import {
   executeMonthlyBillingExport,
   formatDocxDate
 } from '../services/billingExporter';
+import { getLocalYearMonth, MELBOURNE_TZ } from '../utils/dateUtils';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -69,9 +70,13 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     driveUploaded: boolean;
   } | null>(null);
 
-  const currentDate = new Date();
-  const currentMonthPrefix = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
-  const monthName = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+  const { year, monthIndex } = getLocalYearMonth();
+  const currentMonthPrefix = `${year}-${String(monthIndex + 1).padStart(2, '0')}`;
+  const monthName = new Intl.DateTimeFormat('en-AU', {
+    timeZone: MELBOURNE_TZ,
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date());
 
   // 1. Filter encounters by date and export status
   const candidateEncounters = useMemo(() => {

@@ -13,6 +13,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import type { Encounter, ImageBlob, Patient } from '../types';
+import { formatAustralianDate, formatMelbourneTime } from '../utils/dateUtils';
 
 interface EncounterCardProps {
   encounter: Encounter;
@@ -40,14 +41,6 @@ export const EncounterCard: React.FC<EncounterCardProps> = ({
   const [editMrn, setEditMrn] = useState(patient?.mrn || encounter.extractedData?.mrn || '');
   const [editDob, setEditDob] = useState(patient?.dob || encounter.extractedData?.dob || '');
 
-  const formatTime = (isoString: string) => {
-    try {
-      const d = new Date(isoString);
-      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    } catch {
-      return '';
-    }
-  };
 
   const handleSaveEdit = () => {
     const codes = editCodes
@@ -163,12 +156,12 @@ export const EncounterCard: React.FC<EncounterCardProps> = ({
                 <span>•</span>
                 <span className="flex items-center gap-1">
                   <Calendar className="w-3 h-3 text-slate-500" />
-                  {encounter.serviceDate}
+                  {formatAustralianDate(encounter.serviceDate)}
                 </span>
                 <span>•</span>
                 <span className="flex items-center gap-1">
                   <Clock className="w-3 h-3 text-slate-500" />
-                  {formatTime(encounter.capturedAt)}
+                  {formatMelbourneTime(encounter.capturedAt)}
                 </span>
               </div>
             </div>
